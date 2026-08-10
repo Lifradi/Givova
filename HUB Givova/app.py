@@ -20,7 +20,7 @@ def carregar_configuracao():
         with open('usuarios.json', 'r', encoding='utf-8') as f:
             return json.load(f)
     else:
-        # Padrão de segurança caso não ache nada
+        # Padrão caso não ache o arquivo
         return {
             'credentials': {'usernames': {}},
             'cookie': {'name': 'hub_cookie', 'key': 'chave_padrao', 'expiry_days': 1}
@@ -28,7 +28,7 @@ def carregar_configuracao():
 
 config = carregar_configuracao()
 
-# Garante a estrutura do cookie de sessão
+# Configuração do Cookie de Sessão
 cookie_config = {
     'name': 'hub_givova_cookie',
     'key': 'chave_secreta_super_segura_123',
@@ -42,15 +42,18 @@ authenticator = stauth.Authenticate(
     cookie_expiry_days=cookie_config['expiry_days']
 )
 
-# Renderiza a tela de login
-name, authentication_status, username = authenticator.login('Login - Hub de Automação', 'main')
+# --- TELA DE LOGIN CORRIGIDA PARA VERSÕES NOVAS ---
+name, authentication_status, username = authenticator.login(
+    fields={'Form name': 'Login - Hub de Automação'}, 
+    location='main'
+)
 
 if authentication_status == False:
     st.error('❌ Usuário ou senha incorretos.')
 elif authentication_status == None:
     st.warning('⚠️ Por favor, digite seu usuário e senha para entrar.')
 else:
-    # --- ÁREA LOGADA ---
+    # --- ÁREA LOGADA (SÓ APARECE APÓS ACERTAR A SENHA) ---
     authenticator.logout('Sair do Sistema', 'sidebar', key='unique_logout_key')
     
     st.sidebar.markdown(f"👤 **Logado como:** {name}")
