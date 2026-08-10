@@ -11,16 +11,12 @@ st.set_page_config(
 
 # --- CARREGA OS USUÁRIOS DE FORMA EXTERNA ---
 def carregar_configuracao():
-    # Se estiver nas Secrets da nuvem, lê de lá
     if "usuarios_hub" in st.secrets:
         return dict(st.secrets["usuarios_hub"])
-    
-    # Se estiver no computador local, lê do arquivo usuarios.json
     elif os.path.exists('usuarios.json'):
         with open('usuarios.json', 'r', encoding='utf-8') as f:
             return json.load(f)
     else:
-        # Padrão caso não ache o arquivo
         return {
             'credentials': {'usernames': {}},
             'cookie': {'name': 'hub_cookie', 'key': 'chave_padrao', 'expiry_days': 1}
@@ -28,7 +24,6 @@ def carregar_configuracao():
 
 config = carregar_configuracao()
 
-# Configuração do Cookie de Sessão
 cookie_config = {
     'name': 'hub_givova_cookie',
     'key': 'chave_secreta_super_segura_123',
@@ -42,18 +37,19 @@ authenticator = stauth.Authenticate(
     cookie_expiry_days=cookie_config['expiry_days']
 )
 
-# --- TELA DE LOGIN CORRIGIDA PARA VERSÕES NOVAS ---
-name, authentication_status, username = authenticator.login(
-    fields={'Form name': 'Login - Hub de Automação'}, 
-    location='main'
-)
+# --- TELA DE LOGIN CORRIGIDA ---
+authenticator.login()
+
+authentication_status = st.session_state.get('authentication_status')
+name = st.session_state.get('name')
+username = st.session_state.get('username')
 
 if authentication_status == False:
     st.error('❌ Usuário ou senha incorretos.')
 elif authentication_status == None:
     st.warning('⚠️ Por favor, digite seu usuário e senha para entrar.')
 else:
-    # --- ÁREA LOGADA (SÓ APARECE APÓS ACERTAR A SENHA) ---
+    # --- ÁREA LOGADA ---
     authenticator.logout('Sair do Sistema', 'sidebar', key='unique_logout_key')
     
     st.sidebar.markdown(f"👤 **Logado como:** {name}")
