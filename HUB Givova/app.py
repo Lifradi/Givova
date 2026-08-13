@@ -98,6 +98,6 @@ else:
     with col4:
         with st.container(border=True):
             st.subheader("📊 Separador de Cargas")
-            st.write("Lê XMLs e extrai cargas origem/destino.")
+            st.write("Lê XMLs e separa por número de carga.")
             if st.button("Abrir", key="btn_extrator", use_container_width=True):
                 ir_para_extrator()
