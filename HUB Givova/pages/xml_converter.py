@@ -1,5 +1,6 @@
 from datetime import datetime
 import io
+import os
 import re
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
@@ -27,7 +28,7 @@ if not authentication_status:
 
 st.sidebar.markdown(f"👤 **Logado como:** {name}")
 
-st.title("⚡ Conversor de PDF para XML")
+st.title("⚡ Conversor Ultrarrápido de PDF para XML (Sem Inteligência Artificial)")
 st.write(
     "Extrai os dados textuais de PDFs nativos de forma determinística e gera a"
     " estrutura XML instantaneamente."
@@ -42,19 +43,15 @@ uploaded_files = st.file_uploader(
 
 
 def gerar_xml_deterministico(texto_pdf, nome_arquivo):
-  """Extrai chaves e dados do texto do PDF usando Regex e monta um XML válido da SEFAZ."""
-
-  # Tenta achar a chave de acesso de 44 dígitos no texto
+  """Extrai chaves e dados do texto do PDF usando Regex e monta um XML válido da SEFAZ sem IA."""
   digitos_puros = re.sub(r"\D", "", texto_pdf)
   chave_encontrada = ""
   for i in range(len(digitos_puros) - 43):
     bloco = digitos_puros[i : i + 44]
-    # Valida se tem UF válida no começo (ex: 31, 35, etc)
     if bloco[0:2].isdigit() and 11 <= int(bloco[0:2]) <= 53:
       chave_encontrada = bloco
       break
 
-  # Se não achar a chave de 44 dígitos, cria tags vazias baseadas no nome do arquivo
   cUF = chave_encontrada[0:2] if chave_encontrada else "35"
   mod = chave_encontrada[20:22] if chave_encontrada else "55"
   nNF = (
@@ -64,7 +61,6 @@ def gerar_xml_deterministico(texto_pdf, nome_arquivo):
   )
   nnf_val = nNF if nNF else "1"
 
-  # Montando a árvore XML padrão NFe v4.00 de forma programática
   nfe_proc = ET.Element(
       "nfeProc",
       attrib={
@@ -84,7 +80,6 @@ def gerar_xml_deterministico(texto_pdf, nome_arquivo):
       },
   )
 
-  # Grupo de Identificação (ide)
   ide = ET.SubElement(infNFe, "ide")
   ET.SubElement(ide, "cUF").text = cUF
   ET.SubElement(ide, "natOp").text = "VENDAS"
@@ -95,19 +90,16 @@ def gerar_xml_deterministico(texto_pdf, nome_arquivo):
       datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00")
   )
 
-  # Grupo de Pagamento (Obrigatório na v4.00)
   pag = ET.SubElement(infNFe, "pag")
   detPag = ET.SubElement(pag, "detPag")
-  ET.SubElement(detPag, "tPag").text = "01"  # Dinheiro/Outros
+  ET.SubElement(detPag, "tPag").text = "01"
   ET.SubElement(detPag, "vPag").text = "0.00"
 
-  # Informações Adicionais
   infAdic = ET.SubElement(infNFe, "infAdic")
   ET.SubElement(infAdic, "infCpl").text = (
       f"Processado via Hub local sem IA a partir do arquivo {nome_arquivo}"
   )
 
-  # Formata o XML bonito (pretty print)
   rough_string = ET.tostring(nfe_proc, encoding="utf-8")
   reparsed = minidom.parseString(rough_string)
   return reparsed.toprettyxml(indent="  ", encoding="utf-8")
@@ -129,9 +121,7 @@ if uploaded_files:
           if t:
             texto_completo += t + "\n"
 
-        xml_bytes = gerar_xml_deterministico(
-            texto_completo, arquivo.name
-        )
+        xml_bytes = gerar_xml_deterministico(texto_completo, arquivo.name)
         nome_xml = os.path.splitext(arquivo.name)[0] + ".xml"
         resultados_xml.append((nome_xml, xml_bytes))
 
@@ -144,7 +134,6 @@ if uploaded_files:
         "✨ Conversão ultrarrápida concluída sem uso de IA (processamento local)!"
     )
 
-    # Criação de um arquivo ZIP único para baixar todos os XMLs de uma vez
     import zipfile
 
     zip_buffer = io.BytesIO()
