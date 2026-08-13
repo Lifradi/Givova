@@ -1,5 +1,6 @@
 from datetime import datetime
 import io
+import os
 import re
 import unicodedata
 import cv2
@@ -7,6 +8,13 @@ import numpy as np
 import pandas as pd
 import pytesseract
 import streamlit as st
+
+# Configura o caminho do Tesseract dependendo do sistema (Linux no Streamlit Cloud ou Windows local)
+if os.path.exists('/usr/bin/tesseract'):
+  pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+elif os.path.exists('/usr/local/bin/tesseract'):
+  pytesseract.pytesseract.tesseract_cmd = '/usr/local/bin/tesseract'
+# Se estiver no Windows local, ele tentará o padrão ou você pode ajustar se necessário
 
 st.set_page_config(
     page_title="Processador de Canhotos", page_icon="📄", layout="wide"
