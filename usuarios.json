@@ -12,6 +12,10 @@
             "renan.lopes": {
                 "name": "Renan Henrique Lopes de Jesus",
                 "password": "$2b$12$m0g0.Huk9i7R9lRelorpgeVxeI2rHXuI3h4J/zxJ6EhduV3PrDI6q"
+            },
+            "enzo.ouverney": {
+                "name": "Enzo Santos Ouverney",
+                "password": "$2b$12$rAyxmdSJHwBN9m3iwo5fAu2qnZKUlNBx/3oegTZU/LA81vcdpNcum"
             }
         }
     }
