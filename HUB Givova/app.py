@@ -60,7 +60,7 @@ else:
 
     st.markdown("---")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     def ir_para_romaneios():
         st.switch_page("pages/romaneios.py")
@@ -71,23 +71,33 @@ else:
     def ir_para_xml():
         st.switch_page("pages/xml_converter.py")
 
+    def ir_para_extrator():
+        st.switch_page("pages/extrator_xml.py")
+
     with col1:
         with st.container(border=True):
             st.subheader("📦 Romaneios")
-            st.write("Filtra PDFs e baixa notas do Google Drive por UF.")
+            st.write("Filtra PDFs e baixa notas do Google Drive.")
             if st.button("Abrir", key="btn_romaneios", use_container_width=True):
                 ir_para_romaneios()
 
     with col2:
         with st.container(border=True):
             st.subheader("📄 Canhotos")
-            st.write("Lê imagens de DANFE/DACTE e gera relatório Excel.")
+            st.write("Lê imagens e gera relatório Excel.")
             if st.button("Abrir", key="btn_canhotos", use_container_width=True):
                 ir_para_canhotos()
 
     with col3:
         with st.container(border=True):
             st.subheader("⚡ PDF para XML")
-            st.write("Converte PDFs em XML de forma rápida e sem IA.")
+            st.write("Converte PDFs em pacotes de XMLs.")
             if st.button("Abrir", key="btn_xml", use_container_width=True):
                 ir_para_xml()
+
+    with col4:
+        with st.container(border=True):
+            st.subheader("📊 Separador de Cargas")
+            st.write("Lê XMLs e extrai cargas origem/destino.")
+            if st.button("Abrir", key="btn_extrator", use_container_width=True):
+                ir_para_extrator()
