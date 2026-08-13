@@ -1,5 +1,6 @@
 from datetime import datetime
 import io
+import json
 import os
 import re
 import unicodedata
@@ -8,34 +9,79 @@ import numpy as np
 import pandas as pd
 import pytesseract
 import streamlit as st
+import streamlit_authenticator as stauth
 
-# --- CONFIGURAÇÃO BLINDADA DO TESSERACT PARA LINUX E WINDOWS ---
-possible_paths = [
-    '/usr/bin/tesseract',
-    '/usr/local/bin/tesseract',
-    '/app/.apt/usr/bin/tesseract',
-    r'C:\Program Files\Tesseract-OCR\tesseract.exe',
-]
-
-tesseract_encontrado = False
-for path in possible_paths:
-  if os.path.exists(path):
-    pytesseract.pytesseract.tesseract_cmd = path
-    tesseract_encontrado = True
-    break
-
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
     page_title="Processador de Canhotos", page_icon="📄", layout="wide"
 )
 
-st.title("📄 Processador Inteligente de Canhotos (DANFE & DACTE)")
+# --- CARREGA OS USUÁRIOS PARA VALIDAÇÃO DIRETA ---
+def carregar_configuracao():
+  if "usuarios_hub" in st.secrets:
+    return dict(st.secrets["usuarios_hub"])
+  elif os.path.exists("usuarios.json"):
+    with open("usuarios.json", "r", encoding="utf-8") as f:
+      return json.load(f)
+  else:
+    return {
+        "credentials": {"usernames": {}},
+        "cookie": {
+            "name": "hub_cookie",
+            "key": "chave_padrao",
+            "expiry_days": 1,
+        },
+    }
 
-if not tesseract_encontrado:
-  st.warning(
-      "⚠️ O motor Tesseract OCR não foi detectado automaticamente no sistema."
-      " Verifique se o arquivo `packages.txt` está na raiz do repositório."
+
+config = carregar_configuracao()
+
+cookie_config = {
+    "name": "hub_givova_cookie",
+    "key": "chave_secreta_super_segura_123",
+    "expiry_days": 1,
+}
+
+authenticator = stauth.Authenticate(
+    config["credentials"],
+    cookie_config["name"],
+    cookie_config["key"],
+    cookie_expiry_days=cookie_config["expiry_days"],
+)
+
+# Tenta carregar o estado da sessão de login
+authentication_status = st.session_state.get("authentication_status")
+name = st.session_state.get("name")
+username = st.session_state.get("username")
+
+# --- BLOQUEIO DE SEGURANÇA SE NÃO ESTIVER LOGADO ---
+if not authentication_status:
+  st.error(
+      "🔒 Acesso Negado! Por favor, faça o login na página principal do Hub"
+      " primeiro."
   )
+  if st.button("Ir para o Login"):
+    st.switch_page("app.py")
+  st.stop()
 
+# Se estiver logado, exibe os elementos normais da página
+authenticator.logout("Sair do Sistema", "sidebar", key="logout_canhotos")
+st.sidebar.markdown(f"👤 **Logado como:** {name}")
+
+# --- CONFIGURAÇÃO BLINDADA DO TESSERACT ---
+possible_paths = [
+    "/usr/bin/tesseract",
+    "/usr/local/bin/tesseract",
+    "/app/.apt/usr/bin/tesseract",
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+]
+
+for path in possible_paths:
+  if os.path.exists(path):
+    pytesseract.pytesseract.tesseract_cmd = path
+    break
+
+st.title("📄 Processador Inteligente de Canhotos (DANFE & DACTE)")
 st.write(
     "Faça o upload das imagens dos canhotos abaixo para extrair os números das"
     " notas fiscais/CT-es e gerar o relatório em Excel."
@@ -49,7 +95,6 @@ uploaded_files = st.file_uploader(
 
 
 def extrair_dados_texto(texto):
-  """Função rápida que analisa o texto extraído e valida chaves SEFAZ"""
   txt_num = (
       texto.upper()
       .replace("O", "0")
@@ -92,7 +137,6 @@ def extrair_dados_texto(texto):
 
 
 def processar_imagem_bytes(file_bytes):
-  """Processa a imagem a partir dos bytes recebidos no Streamlit"""
   nparr = np.frombuffer(file_bytes, np.uint8)
   img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
   if img is None:
