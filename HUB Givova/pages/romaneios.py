@@ -1,17 +1,72 @@
 import io
+import json
 import os
 import re
 import shutil
 import zipfile
 import PyPDF2
-import streamlit as st
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
+import streamlit as st
+import streamlit_authenticator as stauth
 
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
     page_title="Tratamento de Romaneios", page_icon="📦", layout="centered"
 )
+
+# --- CARREGA OS USUÁRIOS PARA VALIDAÇÃO DIRETA ---
+def carregar_configuracao():
+  if "usuarios_hub" in st.secrets:
+    return dict(st.secrets["usuarios_hub"])
+  elif os.path.exists("usuarios.json"):
+    with open("usuarios.json", "r", encoding="utf-8") as f:
+      return json.load(f)
+  else:
+    return {
+        "credentials": {"usernames": {}},
+        "cookie": {
+            "name": "hub_cookie",
+            "key": "chave_padrao",
+            "expiry_days": 1,
+        },
+    }
+
+
+config = carregar_configuracao()
+
+cookie_config = {
+    "name": "hub_givova_cookie",
+    "key": "chave_secreta_super_segura_123",
+    "expiry_days": 1,
+}
+
+authenticator = stauth.Authenticate(
+    config["credentials"],
+    cookie_config["name"],
+    cookie_config["key"],
+    cookie_expiry_days=cookie_config["expiry_days"],
+)
+
+# Tenta carregar o estado da sessão de login
+authentication_status = st.session_state.get("authentication_status")
+name = st.session_state.get("name")
+username = st.session_state.get("username")
+
+# --- BLOQUEIO DE SEGURANÇA SE NÃO ESTIVER LOGADO ---
+if not authentication_status:
+  st.error(
+      "🔒 Acesso Negado! Por favor, faça o login na página principal do Hub"
+      " primeiro."
+  )
+  if st.button("Ir para o Login"):
+    st.switch_page("app.py")
+  st.stop()
+
+# Se estiver logado, exibe os elementos da barra lateral e o sistema normal
+authenticator.logout("Sair do Sistema", "sidebar", key="logout_romaneios")
+st.sidebar.markdown(f"👤 **Logado como:** {name}")
 
 st.title("📦 Sistema de Tratamento e Baixa de Romaneios por UF")
 st.write(
@@ -53,7 +108,6 @@ def extrair_dados_do_pdf(arquivo_bytes):
 
 def autenticar_drive():
   try:
-    # Carrega as credenciais diretamente do st.secrets configurado na nuvem
     cred_data = {
         "token": None,
         "refresh_token": st.secrets["google_drive"]["refresh_token"],
