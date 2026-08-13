@@ -27,7 +27,7 @@ if not authentication_status:
 
 st.sidebar.markdown(f"👤 **Logado como:** {name}")
 
-st.title("⚡ Conversor Ultrarrápido de PDF para XML (Sem Inteligência Artificial)")
+st.title("⚡ Conversor de PDF para XML")
 st.write(
     "Extrai os dados textuais de PDFs nativos de forma determinística e gera a"
     " estrutura XML instantaneamente."
@@ -42,7 +42,7 @@ uploaded_files = st.file_uploader(
 
 
 def gerar_xml_deterministico(texto_pdf, nome_arquivo):
-  """Extrai chaves e dados do texto do PDF usando Regex e monta um XML válido da SEFAZ sem IA."""
+  """Extrai chaves e dados do texto do PDF usando Regex e monta um XML válido da SEFAZ."""
 
   # Tenta achar a chave de acesso de 44 dígitos no texto
   digitos_puros = re.sub(r"\D", "", texto_pdf)
