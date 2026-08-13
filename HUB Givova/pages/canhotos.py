@@ -9,18 +9,33 @@ import pandas as pd
 import pytesseract
 import streamlit as st
 
-# Configura o caminho do Tesseract dependendo do sistema (Linux no Streamlit Cloud ou Windows local)
-if os.path.exists('/usr/bin/tesseract'):
-  pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
-elif os.path.exists('/usr/local/bin/tesseract'):
-  pytesseract.pytesseract.tesseract_cmd = '/usr/local/bin/tesseract'
-# Se estiver no Windows local, ele tentará o padrão ou você pode ajustar se necessário
+# --- CONFIGURAÇÃO BLINDADA DO TESSERACT PARA LINUX E WINDOWS ---
+possible_paths = [
+    '/usr/bin/tesseract',
+    '/usr/local/bin/tesseract',
+    '/app/.apt/usr/bin/tesseract',
+    r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+]
+
+tesseract_encontrado = False
+for path in possible_paths:
+  if os.path.exists(path):
+    pytesseract.pytesseract.tesseract_cmd = path
+    tesseract_encontrado = True
+    break
 
 st.set_page_config(
     page_title="Processador de Canhotos", page_icon="📄", layout="wide"
 )
 
 st.title("📄 Processador Inteligente de Canhotos (DANFE & DACTE)")
+
+if not tesseract_encontrado:
+  st.warning(
+      "⚠️ O motor Tesseract OCR não foi detectado automaticamente no sistema."
+      " Verifique se o arquivo `packages.txt` está na raiz do repositório."
+  )
+
 st.write(
     "Faça o upload das imagens dos canhotos abaixo para extrair os números das"
     " notas fiscais/CT-es e gerar o relatório em Excel."
