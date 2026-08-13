@@ -10,7 +10,7 @@ import streamlit_authenticator as stauth
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
-    page_title="Extrator de Cargas de XMLs", page_icon="📊", layout="wide"
+    page_title="Separador de Cargas", page_icon="📊", layout="wide"
 )
 
 # --- VALIDAÇÃO DE SEGURANÇA DA SESSÃO ---
@@ -28,7 +28,7 @@ if not authentication_status:
 
 st.sidebar.markdown(f"👤 **Logado como:** {name}")
 
-st.title("📊 Extrator de Carga Origem e Destino de XMLs")
+st.title("📊 Separador de Cargas por XML")
 st.write(
     "Faça o upload dos arquivos XML das notas fiscais para extrair os números das"
     " notas e as respectivas cargas das observações de forma automática."
@@ -39,7 +39,7 @@ uploaded_files = st.file_uploader(
     "Selecione os arquivos XML",
     type=["xml"],
     accept_multiple_files=True,
-    key="uploader_extrator_xml",
+    key="uploader_separador_cargas",
 )
 
 
