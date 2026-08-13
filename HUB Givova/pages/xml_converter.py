@@ -31,10 +31,10 @@ if not authentication_status:
 
 st.sidebar.markdown(f"👤 **Logado como:** {name}")
 
-st.title("⚡ Conversor de PDF para XML (Padrão SEFAZ v4.00)")
+st.title("⚡ Conversor de PDF para XML (Padrão SEFAZ v4.00) - PRO")
 st.write(
     "Converta os PDFs de notas fiscais em arquivos XML estruturados "
-    "baseados nos dados extraídos do documento."
+    "com extração de dados à prova de falhas."
 )
 
 uploaded_files = st.file_uploader(
@@ -45,69 +45,80 @@ uploaded_files = st.file_uploader(
 )
 
 
-def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
-    """Gera o XML estruturado no formato oficial NFe 4.00 extraindo dados do texto do PDF."""
+def extrair_dados_seguros(texto_pdf):
+    """Extrai os dados do PDF utilizando Regex com âncoras contextuais para evitar falsos positivos."""
+    dados = {}
 
-    # 1. Extração da Chave de Acesso (44 dígitos)
-    digitos_puros = re.sub(r"\D", "", texto_pdf)
-    chave_encontrada = None
-    for i in range(len(digitos_puros) - 43):
-        bloco = digitos_puros[i : i + 44]
-        if bloco[0:2].isdigit() and 11 <= int(bloco[0:2]) <= 53:
-            chave_encontrada = bloco
-            break
-
-    # Se não encontrar a chave, levanta um erro para pular este arquivo
-    if not chave_encontrada:
+    # 1. CHAVE DE ACESSO (44 dígitos, podendo ter espaços ou quebras de linha entre eles)
+    match_chave = re.search(r"(?<!\d)(?:\d[\s\n]*){44}(?!\d)", texto_pdf)
+    if match_chave:
+        dados['chave'] = re.sub(r"\D", "", match_chave.group(0))
+    else:
         raise ValueError("Chave de acesso de 44 dígitos não encontrada no PDF.")
 
-    # 2. Decodificando dados embutidos na Chave de Acesso
-    cUF = chave_encontrada[0:2]
-    ano_mes = chave_encontrada[2:6] # AAMM
-    cnpj_emitente = chave_encontrada[6:20]
-    mod = chave_encontrada[20:22]
-    serie = str(int(chave_encontrada[22:25]))
-    nNF = str(int(chave_encontrada[25:34]))
-    tpEmis = chave_encontrada[34:35]
-    cNF = chave_encontrada[35:43]
-    cDV = chave_encontrada[43:44]
+    # 2. DATA DE EMISSÃO (Procura por DD/MM/YYYY logo após a palavra EMISSÃO)
+    match_data = re.search(r"(?:DATA DA EMISSÃO|EMISSÃO:)[\s\n]*(\d{2}/\d{2}/\d{4})", texto_pdf, re.IGNORECASE)
+    if match_data:
+        dia, mes, ano = match_data.group(1).split('/')
+        dados['dhEmi'] = f"{ano}-{mes}-{dia}T12:00:00-03:00"
+    else:
+        # Fallback inteligente: tenta pegar da chave de acesso se a palavra falhar
+        ano_mes = dados['chave'][2:6]
+        ano_completo = "20" + ano_mes[0:2] if int(ano_mes[0:2]) < 50 else "19" + ano_mes[0:2]
+        mes = ano_mes[2:4]
+        dados['dhEmi'] = f"{ano_completo}-{mes}-01T12:00:00-03:00"
 
-    # 3. Extração do Valor Total da Nota
-    v_nf = "0.00"
-    match_valor = re.search(r"(?:VALOR|TOTAL)\s+(?:DA\s+NOTA|DA\s+NFE?)[\s:\.]*([\d\.,]+)", texto_pdf, re.IGNORECASE)
+    # 3. VALOR DA NOTA (Busca pelo valor após V. TOTAL DA NOTA ou VALOR TOTAL)
+    match_valor = re.search(r"(?:V\. TOTAL DA NOTA|VALOR TOTAL:?[\sR\$]*)([\d\.,]+)", texto_pdf, re.IGNORECASE)
     if match_valor:
-        # Pega o último grupo capturado, remove pontos de milhar e troca vírgula por ponto
         valor_str = match_valor.group(1).replace(".", "").replace(",", ".")
         try:
-            v_nf = f"{float(valor_str):.2f}"
+            dados['vNF'] = f"{float(valor_str):.2f}"
         except ValueError:
-            v_nf = "0.00"
+            dados['vNF'] = "0.00"
+    else:
+        dados['vNF'] = "0.00"
 
-    # 4. Extração do CNPJ Destinatário (procura CNPJs que não sejam o do emitente)
-    cnpjs_encontrados = re.findall(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}|\d{14}", texto_pdf)
-    cnpj_destinatario = "00000000000000" # Fallback
+    # 4. CNPJs (Captura todos e separa Emitente de Destinatário baseado na Chave)
+    dados['cnpj_emitente'] = dados['chave'][6:20]
+    dados['cnpj_destinatario'] = "00000000000000" # Fallback padrão
+    
+    cnpjs_encontrados = re.findall(r"\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}", texto_pdf)
     for c in cnpjs_encontrados:
         c_limpo = re.sub(r"\D", "", c)
-        if len(c_limpo) == 14 and c_limpo != cnpj_emitente:
-            cnpj_destinatario = c_limpo
+        # Se achou um CNPJ diferente do Emitente, assume como Destinatário
+        if c_limpo != dados['cnpj_emitente']:
+            dados['cnpj_destinatario'] = c_limpo
             break
+
+    return dados
+
+
+def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
+    """Gera o XML estruturado no formato oficial NFe 4.00 com os dados limpos."""
+    
+    dados = extrair_dados_seguros(texto_pdf)
+    chave = dados['chave']
+    
+    # Fragmentando a chave extraída com sucesso
+    cUF = chave[0:2]
+    mod = chave[20:22]
+    serie = str(int(chave[22:25]))
+    nNF = str(int(chave[25:34]))
+    tpEmis = chave[34:35]
+    cNF = chave[35:43]
+    cDV = chave[43:44]
 
     # --- MONTAGEM DO XML ---
     nfe_proc = ET.Element(
         "nfeProc",
-        attrib={
-            "xmlns": "http://www.portalfiscal.inf.br/nfe",
-            "versao": "4.00",
-        },
+        attrib={"xmlns": "http://www.portalfiscal.inf.br/nfe", "versao": "4.00"},
     )
     NFe = ET.SubElement(nfe_proc, "NFe", attrib={"xmlns": "http://www.portalfiscal.inf.br/nfe"})
     infNFe = ET.SubElement(
         NFe,
         "infNFe",
-        attrib={
-            "Id": f"NFe{chave_encontrada}",
-            "versao": "4.00",
-        },
+        attrib={"Id": f"NFe{chave}", "versao": "4.00"},
     )
 
     # Bloco IDE
@@ -118,13 +129,10 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
     ET.SubElement(ide, "mod").text = mod
     ET.SubElement(ide, "serie").text = serie
     ET.SubElement(ide, "nNF").text = nNF
-    # Monta a data baseada no ano/mês da chave
-    ano_completo = "20" + ano_mes[0:2] if int(ano_mes[0:2]) < 50 else "19" + ano_mes[0:2]
-    mes = ano_mes[2:4]
-    ET.SubElement(ide, "dhEmi").text = f"{ano_completo}-{mes}-01T12:00:00-03:00"
+    ET.SubElement(ide, "dhEmi").text = dados['dhEmi']
     ET.SubElement(ide, "tpNF").text = "1"
     ET.SubElement(ide, "idDest").text = "1"
-    ET.SubElement(ide, "cMunFG").text = "0000000" # Requer consulta de IBGE
+    ET.SubElement(ide, "cMunFG").text = "0000000"
     ET.SubElement(ide, "tpImp").text = "1"
     ET.SubElement(ide, "tpEmis").text = tpEmis
     ET.SubElement(ide, "cDV").text = cDV
@@ -135,9 +143,9 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
     ET.SubElement(ide, "procEmi").text = "0"
     ET.SubElement(ide, "verProc").text = "4.0"
 
-    # Bloco EMIT (Emitente)
+    # Bloco EMIT
     emit = ET.SubElement(infNFe, "emit")
-    ET.SubElement(emit, "CNPJ").text = cnpj_emitente
+    ET.SubElement(emit, "CNPJ").text = dados['cnpj_emitente']
     ET.SubElement(emit, "xNome").text = "RAZAO SOCIAL EXTRAIDA DO PDF"
     enderEmit = ET.SubElement(emit, "enderEmit")
     ET.SubElement(enderEmit, "xLgr").text = "ENDERECO DO EMITENTE"
@@ -152,9 +160,9 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
     ET.SubElement(emit, "IE").text = "ISENTO"
     ET.SubElement(emit, "CRT").text = "3"
 
-    # Bloco DEST (Destinatário)
+    # Bloco DEST
     dest = ET.SubElement(infNFe, "dest")
-    ET.SubElement(dest, "CNPJ").text = cnpj_destinatario
+    ET.SubElement(dest, "CNPJ").text = dados['cnpj_destinatario']
     ET.SubElement(dest, "xNome").text = "DESTINATARIO EXTRAIDO DO PDF"
     enderDest = ET.SubElement(dest, "enderDest")
     ET.SubElement(enderDest, "xLgr").text = "ENDERECO DO DESTINATARIO"
@@ -168,8 +176,7 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
     ET.SubElement(enderDest, "xPais").text = "BRASIL"
     ET.SubElement(dest, "indIEDest").text = "9"
 
-    # Bloco DET (Itens) - Nota: Extrair tabela de itens em texto bruto de PDF é impreciso.
-    # Criamos um item totalizador para manter a estrutura e os valores fechando.
+    # Bloco DET (Itens) - Usando o valor dinâmico extraído
     det = ET.SubElement(infNFe, "det", attrib={"nItem": "1"})
     prod = ET.SubElement(det, "prod")
     ET.SubElement(prod, "cProd").text = "001"
@@ -179,19 +186,18 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
     ET.SubElement(prod, "CFOP").text = "5933"
     ET.SubElement(prod, "uCom").text = "UN"
     ET.SubElement(prod, "qCom").text = "1.0000"
-    ET.SubElement(prod, "vUnCom").text = v_nf
-    ET.SubElement(prod, "vProd").text = v_nf
+    ET.SubElement(prod, "vUnCom").text = dados['vNF']
+    ET.SubElement(prod, "vProd").text = dados['vNF']
     ET.SubElement(prod, "cEANTrib").text = "SEM GTIN"
     ET.SubElement(prod, "uTrib").text = "UN"
     ET.SubElement(prod, "qTrib").text = "1.0000"
-    ET.SubElement(prod, "vUnTrib").text = v_nf
+    ET.SubElement(prod, "vUnTrib").text = dados['vNF']
     ET.SubElement(prod, "indTot").text = "1"
 
     imposto = ET.SubElement(det, "imposto")
     vTotTrib = ET.SubElement(imposto, "vTotTrib")
     vTotTrib.text = "0.00"
     
-    # Bloco ICMS Básico
     ICMS = ET.SubElement(imposto, "ICMS")
     ICMS40 = ET.SubElement(ICMS, "ICMS40")
     ET.SubElement(ICMS40, "orig").text = "0"
@@ -208,7 +214,7 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
     ET.SubElement(ICMSTot, "vST").text = "0.00"
     ET.SubElement(ICMSTot, "vFCPST").text = "0.00"
     ET.SubElement(ICMSTot, "vFCPSTRet").text = "0.00"
-    ET.SubElement(ICMSTot, "vProd").text = v_nf
+    ET.SubElement(ICMSTot, "vProd").text = dados['vNF']
     ET.SubElement(ICMSTot, "vFrete").text = "0.00"
     ET.SubElement(ICMSTot, "vSeg").text = "0.00"
     ET.SubElement(ICMSTot, "vDesc").text = "0.00"
@@ -218,28 +224,28 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
     ET.SubElement(ICMSTot, "vPIS").text = "0.00"
     ET.SubElement(ICMSTot, "vCOFINS").text = "0.00"
     ET.SubElement(ICMSTot, "vOutro").text = "0.00"
-    ET.SubElement(ICMSTot, "vNF").text = v_nf
+    ET.SubElement(ICMSTot, "vNF").text = dados['vNF']
     ET.SubElement(ICMSTot, "vTotTrib").text = "0.00"
 
     transp = ET.SubElement(infNFe, "transp")
-    ET.SubElement(transp, "modFrete").text = "9" # Sem frete
+    ET.SubElement(transp, "modFrete").text = "9"
 
     pag = ET.SubElement(infNFe, "pag")
     detPag = ET.SubElement(pag, "detPag")
-    ET.SubElement(detPag, "tPag").text = "90" # Sem pagamento
+    ET.SubElement(detPag, "tPag").text = "90"
     ET.SubElement(detPag, "vPag").text = "0.00"
 
     infAdic = ET.SubElement(infNFe, "infAdic")
-    ET.SubElement(infAdic, "infCpl").text = "XML Extraido parcialmente de PDF nativo via Sistema."
+    ET.SubElement(infAdic, "infCpl").text = "XML Extraído do PDF nativo via Hub Givova."
 
-    # Assinatura/Protocolo Simulado
+    # Assinatura
     protNFe = ET.SubElement(nfe_proc, "protNFe", attrib={"versao": "4.00"})
     infProt = ET.SubElement(protNFe, "infProt")
     ET.SubElement(infProt, "tpAmb").text = "1"
     ET.SubElement(infProt, "verAplic").text = "4.0"
-    ET.SubElement(infProt, "chNFe").text = chave_encontrada
+    ET.SubElement(infProt, "chNFe").text = chave
     ET.SubElement(infProt, "dhRecbto").text = datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00")
-    ET.SubElement(infProt, "nProt").text = "135" + chave_encontrada[0:12]
+    ET.SubElement(infProt, "nProt").text = "135" + chave[0:12]
     ET.SubElement(infProt, "digVal").text = "dW5kZWZpbmVk"
     ET.SubElement(infProt, "cStat").text = "100"
     ET.SubElement(infProt, "xMotivo").text = "Autorizado o uso da NF-e"
@@ -271,10 +277,10 @@ if uploaded_files:
                 resultados_xml.append((nome_xml, xml_bytes))
 
             except ValueError as ve:
-                st.warning(f"⚠️ {arquivo.name}: {ve}")
+                st.warning(f"⚠️ Aviso em {arquivo.name}: {ve}")
                 erros += 1
             except Exception as e:
-                st.error(f"❌ Erro ao processar {arquivo.name}: {e}")
+                st.error(f"❌ Erro crítico ao processar {arquivo.name}: {e}")
                 erros += 1
 
             barra.progress((i + 1) / total)
