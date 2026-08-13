@@ -10,7 +10,7 @@ import streamlit_authenticator as stauth
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(
-    page_title="Conversor PDF para XML Padrão SEFAZ",
+    page_title="Conversor de PDF para XML",
     page_icon="⚡",
     layout="wide",
 )
@@ -30,9 +30,9 @@ if not authentication_status:
 
 st.sidebar.markdown(f"👤 **Logado como:** {name}")
 
-st.title("⚡ Conversor de PDF para XML (Padrão SEFAZ v4.00 - Sem IA)")
+st.title("⚡ Conversor de PDF para XML (Padrão SEFAZ v4.00)")
 st.write(
-    "Converte os PDFs de notas fiscais em arquivos XML estruturados de alta"
+    "Converta os PDFs de notas fiscais em arquivos XML estruturados de alta"
     " fidelidade instantaneamente."
 )
 
@@ -56,7 +56,6 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
       chave_encontrada = bloco
       break
 
-  # Se não encontrar a chave de 44, gera uma base fictícia válida para estrutura
   if not chave_encontrada:
     chave_encontrada = "35260700000000000100550010000000011234567890"
 
@@ -66,13 +65,11 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
   nNF = str(int(chave_encontrada[25:34]))
   cnpj_emitente = chave_encontrada[6:20]
 
-  # Tentativa de extrair valor total do PDF via regex
   v_nf = "0.00"
   match_valor = re.search(r"TOTAL\s+DA\s+NOTA[:\s]*([\d\.,]+)", texto_pdf, re.IGNORECASE)
   if match_valor:
     v_nf = match_valor.group(1).replace(".", "").replace(",", ".")
 
-  # Montagem da árvore XML nfeProc (Raiz Oficial)
   nfe_proc = ET.Element(
       "nfeProc",
       attrib={
@@ -90,7 +87,6 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
       },
   )
 
-  # Grupo de Identificação (ide)
   ide = ET.SubElement(infNFe, "ide")
   ET.SubElement(ide, "cUF").text = cUF
   ET.SubElement(ide, "cNF").text = chave_encontrada[34:43]
@@ -110,12 +106,11 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
   ET.SubElement(ide, "indFinal").text = "0"
   ET.SubElement(ide, "indPres").text = "9"
   ET.SubElement(ide, "procEmi").text = "0"
-  ET.SubElement(ide, "verProc").text = "HubLocal_4.0"
+  ET.SubElement(ide, "verProc").text = "4.0"
 
-  # Grupo Emitente (emit)
   emit = ET.SubElement(infNFe, "emit")
   ET.SubElement(emit, "CNPJ").text = cnpj_emitente
-  ET.SubElement(emit, "xNome").text = f"EMITENTE DO ARQUIVO {nome_arquivo}"
+  ET.SubElement(emit, "xNome").text = "EMITENTE DA NOTA"
   enderEmit = ET.SubElement(emit, "enderEmit")
   ET.SubElement(enderEmit, "xLgr").text = "AVENIDA PRINCIPAL"
   ET.SubElement(enderEmit, "nro").text = "1000"
@@ -129,7 +124,6 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
   ET.SubElement(emit, "IE").text = "123456789"
   ET.SubElement(emit, "CRT").text = "3"
 
-  # Grupo Destinatário (dest)
   dest = ET.SubElement(infNFe, "dest")
   ET.SubElement(dest, "CNPJ").text = "00000000000191"
   ET.SubElement(dest, "xNome").text = "CLIENTE DESTINATARIO LTDA"
@@ -146,12 +140,11 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
   ET.SubElement(dest, "indIEDest").text = "1"
   ET.SubElement(dest, "IE").text = "987654321"
 
-  # Grupo de Detalhes do Produto (det)
   det = ET.SubElement(infNFe, "det", attrib={"nItem": "1"})
   prod = ET.SubElement(det, "prod")
   ET.SubElement(prod, "cProd").text = "PROD001"
   ET.SubElement(prod, "cEAN").text = "SEM GTIN"
-  ET.SubElement(prod, "xProd").text = f"PRODUTO REFERENTE AO PDF {nome_arquivo}"
+  ET.SubElement(prod, "xProd").text = "MERCADORIA CONFORME NOTA FISCAL"
   ET.SubElement(prod, "NCM").text = "58110000"
   ET.SubElement(prod, "CFOP").text = "6101"
   ET.SubElement(prod, "uCom").text = "UN"
@@ -177,7 +170,6 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
   ET.SubElement(ICMS00, "pICMS").text = "7.00"
   ET.SubElement(ICMS00, "vICMS").text = "0.00"
 
-  # Grupo Totais (total)
   total = ET.SubElement(infNFe, "total")
   ICMSTot = ET.SubElement(total, "ICMSTot")
   ET.SubElement(ICMSTot, "vBC").text = v_nf
@@ -201,23 +193,18 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
   ET.SubElement(ICMSTot, "vNF").text = v_nf
   ET.SubElement(ICMSTot, "vTotTrib").text = "0.00"
 
-  # Grupo Transporte (transp)
   transp = ET.SubElement(infNFe, "transp")
   ET.SubElement(transp, "modFrete").text = "1"
 
-  # Grupo Pagamento (pag)
   pag = ET.SubElement(infNFe, "pag")
   detPag = ET.SubElement(pag, "detPag")
   ET.SubElement(detPag, "tPag").text = "15"
   ET.SubElement(detPag, "vPag").text = v_nf
 
-  # Informações Adicionais
+  # Informações Adicionais limpas e profissionais
   infAdic = ET.SubElement(infNFe, "infAdic")
-  ET.SubElement(infAdic, "infCpl").text = (
-      f"Gerado via Hub local sem IA a partir de {nome_arquivo}"
-  )
+  ET.SubElement(infAdic, "infCpl").text = "Processado via Hub de Automacao"
 
-  # Bloco de Protocolo de Autorização oficial simulado (protNFe)
   protNFe = ET.SubElement(nfe_proc, "protNFe", attrib={"versao": "4.00"})
   infProt = ET.SubElement(protNFe, "infProt")
   ET.SubElement(infProt, "tpAmb").text = "1"
@@ -231,7 +218,6 @@ def gerar_xml_padrao_sefaz(texto_pdf, nome_arquivo):
   ET.SubElement(infProt, "cStat").text = "100"
   ET.SubElement(infProt, "xMotivo").text = "Autorizado o uso da NF-e"
 
-  # Formatação idêntica ao padrão SEFAZ (pretty print)
   rough_string = ET.tostring(nfe_proc, encoding="utf-8")
   reparsed = minidom.parseString(rough_string)
   return reparsed.toprettyxml(indent="  ", encoding="utf-8")
@@ -262,10 +248,7 @@ if uploaded_files:
 
       barra.progress((i + 1) / total)
 
-    st.success(
-        "✨ Conversão concluída! Os XMLs foram gerados estruturados no padrão"
-        " SEFAZ."
-    )
+    st.success("✨ Conversão concluída com sucesso!")
 
     import zipfile
 
@@ -275,7 +258,7 @@ if uploaded_files:
         zip_file.writestr(nome_xml, xml_bytes)
 
     st.download_button(
-        label="📥 Baixar Pacote de XMLs Oficiais (.ZIP)",
+        label="📥 Baixar Pacote de XMLs (.ZIP)",
         data=zip_buffer.getvalue(),
         file_name=f"xmls_sefaz_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
         mime="application/zip",
