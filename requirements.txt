@@ -9,4 +9,4 @@ openpyxl
 opencv-python-headless
 numpy
 pytesseract
-pdflumber
+pdfplumber
