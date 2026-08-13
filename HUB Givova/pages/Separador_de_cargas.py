@@ -1,69 +1,135 @@
+import io
+import json
 import os
-import shutil
 import re
+import zipfile
+import streamlit as st
+import streamlit_authenticator as stauth
 
-def organizar_xmls_por_carga():
-    # Define os diretórios de entrada e saída conforme a sua estrutura
-    pasta_entrada = 'entrada'
-    pasta_saida = 'saida'
+# --- CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(
+    page_title="Organizador de XMLs por Carga", page_icon="📁", layout="centered"
+)
 
-    # Cria a pasta de saída principal caso ela tenha sido apagada acidentalmente
-    if not os.path.exists(pasta_saida):
-        os.makedirs(pasta_saida)
+# --- CARREGA OS USUÁRIOS PARA VALIDAÇÃO DIRETA ---
+def carregar_configuracao():
+  if "usuarios_hub" in st.secrets:
+    return dict(st.secrets["usuarios_hub"])
+  elif os.path.exists("usuarios.json"):
+    with open("usuarios.json", "r", encoding="utf-8") as f:
+      return json.load(f)
+  else:
+    return {
+        "credentials": {"usernames": {}},
+        "cookie": {
+            "name": "hub_cookie",
+            "key": "chave_padrao",
+            "expiry_days": 1,
+        },
+    }
 
-    # Verifica se a pasta de entrada existe
-    if not os.path.exists(pasta_entrada):
-        print(f"Erro: A pasta '{pasta_entrada}' não foi encontrada.")
-        return
+config = carregar_configuracao()
 
-    # Expressão regular para localizar o número da carga (Ex: "Carga: 258066")
-    padrao_carga = re.compile(r'Carga:\s*(\d+)', re.IGNORECASE)
+cookie_config = {
+    "name": "hub_givova_cookie",
+    "key": "chave_secreta_super_segura_123",
+    "expiry_days": 1,
+}
+
+authenticator = stauth.Authenticate(
+    config["credentials"],
+    cookie_config["name"],
+    cookie_config["key"],
+    cookie_expiry_days=cookie_config["expiry_days"],
+)
+
+# Tenta carregar o estado da sessão de login
+authentication_status = st.session_state.get("authentication_status")
+name = st.session_state.get("name")
+username = st.session_state.get("username")
+
+# --- BLOQUEIO DE SEGURANÇA SE NÃO ESTIVER LOGADO ---
+if not authentication_status:
+  st.error(
+      "🔒 Acesso Negado! Por favor, faça o login na página principal do Hub"
+      " primeiro."
+  )
+  if st.button("Ir para o Login"):
+    st.switch_page("app.py")
+  st.stop()
+
+# Se estiver logado, exibe os elementos da barra lateral
+authenticator.logout("Sair do Sistema", "sidebar", key="logout_xmls")
+st.sidebar.markdown(f"👤 **Logado como:** {name}")
+
+# --- CORPO DO SISTEMA ---
+st.title("📁 Organizador de XMLs por Carga")
+st.write(
+    "Envie seus arquivos XMLs de notas/romaneios. O sistema lê o conteúdo, "
+    "separa-os automaticamente por número de carga e gera um arquivo ZIP organizado."
+)
+
+# Componente para upload de múltiplos arquivos XML
+arquivos_xml = st.file_uploader(
+    "📂 Envie os arquivos XML", type=["xml"], accept_multiple_files=True
+)
+
+if arquivos_xml:
+  if st.button("🚀 Processar e Organizar XMLs"):
+    padrao_carga = re.compile(r"Carga:\s*(\d+)", re.IGNORECASE)
 
     contador_sucesso = 0
     contador_erro = 0
+    cargas_encontradas = {}  # Dicionário para armazenar {numero_carga: {nome_arquivo: bytes}}
 
-    # Percorre todos os arquivos dentro da pasta 'entrada'
-    for nome_arquivo in os.listdir(pasta_entrada):
-        # Filtra apenas os arquivos com extensão .xml
-        if nome_arquivo.lower().endswith('.xml'):
-            caminho_origem = os.path.join(pasta_entrada, nome_arquivo)
+    with st.spinner("Processando e organizando os arquivos..."):
+      for arquivo in arquivos_xml:
+        nome_arquivo = arquivo.name
+        try:
+          bytes_conteudo = arquivo.read()
+          conteudo_texto = bytes_conteudo.decode("utf-8", errors="ignore")
+          match = padrao_carga.search(conteudo_texto)
 
-            try:
-                # Abre e lê o conteúdo do XML (tratando a codificação padrão)
-                with open(caminho_origem, 'r', encoding='utf-8', errors='ignore') as arquivo_xml:
-                    conteudo = arquivo_xml.read()
+          if match:
+            numero_carga = match.group(1)
 
-                # Busca o padrão da carga no texto do arquivo
-                match = padrao_carga.search(conteudo)
+            if numero_carga not in cargas_encontradas:
+              cargas_encontradas[numero_carga] = {}
 
-                if match:
-                    # Extrai apenas os números da carga
-                    numero_carga = match.group(1)
-                    nome_subpasta = f"carga {numero_carga}"
-                    caminho_subpasta = os.path.join(pasta_saida, nome_subpasta)
+            cargas_encontradas[numero_carga][nome_arquivo] = bytes_conteudo
+            contador_sucesso += 1
+          else:
+            contador_erro += 1
 
-                    # Cria a subpasta na 'saida' se ela ainda não existir
-                    if not os.path.exists(caminho_subpasta):
-                        os.makedirs(caminho_subpasta)
+        except Exception as e:
+          contador_erro += 1
 
-                    # Move o arquivo da 'entrada' para a subpasta correspondente na 'saida'
-                    caminho_destino = os.path.join(caminho_subpasta, nome_arquivo)
-                    shutil.move(caminho_origem, caminho_destino)
-                    
-                    print(f"[OK] Arquivo '{nome_arquivo}' movido para '{nome_subpasta}'.")
-                    contador_sucesso += 1
-                else:
-                    print(f"[Aviso] Nenhuma 'Carga' encontrada no arquivo '{nome_arquivo}'.")
-                    contador_erro += 1
+    # Exibe métricas do processamento
+    col1, col2 = st.columns(2)
+    col1.metric("XMLs Organizados com Sucesso", contador_sucesso)
+    col2.metric("XMLs sem Carga / Erros", contador_erro)
 
-            except Exception as e:
-                print(f"[Erro] Falha ao processar o arquivo '{nome_arquivo}': {e}")
-                contador_erro += 1
+    if contador_sucesso > 0:
+      zip_buffer = io.BytesIO()
 
-    print("-" * 30)
-    print("Processamento Concluído!")
-    print(f"Arquivos movidos com sucesso: {contador_sucesso}")
-    print(f"Arquivos ignorados/com erro: {contador_erro}")
+      with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for carga, arquivos_dict in cargas_encontradas.items():
+          for nome_arq, conteudo_bytes in arquivos_dict.items():
+            caminho_no_zip = f"carga {carga}/{nome_arq}"
+            zipf.writestr(caminho_no_zip, conteudo_bytes)
 
-if __name__ == "__main__":
-    organizar_xmls_por_carga()
+      zip_buffer.seek(0)
+
+      st.success("✅ Organização concluída com sucesso!")
+
+      st.download_button(
+          label="📥 Baixar ZIP Organizado por Cargas",
+          data=zip_buffer,
+          file_name="xmls_organizados_por_carga.zip",
+          mime="application/zip",
+          key="btn_download_xmls",
+      )
+    else:
+      st.warning(
+          "⚠️ Nenhum arquivo continha uma 'Carga' válida para ser organizado."
+      )
