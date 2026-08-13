@@ -14,10 +14,10 @@ st.set_page_config(
 
 st.title("📄 Processador Inteligente de Canhotos (DANFE & DACTE)")
 st.write(
-    "Faça o upload das imagens dos canhotos abaixo para extrair os números das notas fiscais/CT-es e gerar o relatório em Excel."
+    "Faça o upload das imagens dos canhotos abaixo para extrair os números das"
+    " notas fiscais/CT-es e gerar o relatório em Excel."
 )
 
-# Upload de múltiplos arquivos de imagem
 uploaded_files = st.file_uploader(
     "Selecione as imagens dos canhotos",
     type=["jpg", "jpeg", "png"],
@@ -59,7 +59,6 @@ def extrair_dados_texto(texto):
   if chave_nfe:
     return "NOTA", str(int(chave_nfe[25:34]))
 
-  # Fallback rápido para DANFE por campo N.
   matches_n = re.findall(r"N[ºo\.\s]*(\d[\d.\-\s]{5,10}\d)", texto, re.IGNORECASE)
   for m in matches_n:
     num_limpo = re.sub(r"\D", "", m)
@@ -79,16 +78,13 @@ def processar_imagem_bytes(file_bytes):
   rotacoes = [0, 180, 90, 270]
   for rotacao in rotacoes:
     img_proc = img
-    if rotacao == 185:  # segurança caso ajuste
-      pass
-    elif rotacao == 180:
+    if rotacao == 180:
       img_proc = cv2.rotate(img, cv2.ROTATE_180)
     elif rotacao == 90:
       img_proc = cv2.rotate(img, cv2.ROTATE_90_CLOCKWISE)
     elif rotacao == 270:
       img_proc = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
-    # Reduz levemente para acelerar o OCR
     h, w = img_proc.shape[:2]
     if w > 1200:
       ratio = 1200 / w
@@ -139,14 +135,12 @@ if uploaded_files:
 
       barra_progresso.progress((i + 1) / total_arquivos)
 
-    # Cria o DataFrame com os resultados
     df_relatorio = pd.DataFrame(dados_relatorio)
 
     st.success("✨ Processamento concluído com sucesso!")
     st.subheader("📊 Prévia do Relatório")
     st.dataframe(df_relatorio, use_container_width=True)
 
-    # Prepara o arquivo Excel em memória para o botão de download
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
       df_relatorio.to_excel(writer, index=False)
