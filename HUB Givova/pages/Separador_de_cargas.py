@@ -1,125 +1,69 @@
-from datetime import datetime
-import io
-import json
 import os
+import shutil
 import re
-import xml.etree.ElementTree as ET
-import pandas as pd
-import streamlit as st
-import streamlit_authenticator as stauth
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(
-    page_title="Separador de Cargas", page_icon="📊", layout="wide"
-)
+def organizar_xmls_por_carga():
+    # Define os diretórios de entrada e saída conforme a sua estrutura
+    pasta_entrada = 'entrada'
+    pasta_saida = 'saida'
 
-# --- VALIDAÇÃO DE SEGURANÇA DA SESSÃO ---
-authentication_status = st.session_state.get("authentication_status")
-name = st.session_state.get("name")
+    # Cria a pasta de saída principal caso ela tenha sido apagada acidentalmente
+    if not os.path.exists(pasta_saida):
+        os.makedirs(pasta_saida)
 
-if not authentication_status:
-  st.error(
-      "🔒 Acesso Negado! Por favor, faça o login na página principal do Hub"
-      " primeiro."
-  )
-  if st.button("Ir para o Login"):
-    st.switch_page("app.py")
-  st.stop()
+    # Verifica se a pasta de entrada existe
+    if not os.path.exists(pasta_entrada):
+        print(f"Erro: A pasta '{pasta_entrada}' não foi encontrada.")
+        return
 
-st.sidebar.markdown(f"👤 **Logado como:** {name}")
+    # Expressão regular para localizar o número da carga (Ex: "Carga: 258066")
+    padrao_carga = re.compile(r'Carga:\s*(\d+)', re.IGNORECASE)
 
-st.title("📊 Separador de Cargas por XML")
-st.write(
-    "Faça o upload dos arquivos XML das notas fiscais para extrair os números das"
-    " notas e as respectivas cargas das observações de forma automática."
-)
+    contador_sucesso = 0
+    contador_erro = 0
 
-# Upload de múltiplos arquivos XML
-uploaded_files = st.file_uploader(
-    "Selecione os arquivos XML",
-    type=["xml"],
-    accept_multiple_files=True,
-    key="uploader_separador_cargas",
-)
+    # Percorre todos os arquivos dentro da pasta 'entrada'
+    for nome_arquivo in os.listdir(pasta_entrada):
+        # Filtra apenas os arquivos com extensão .xml
+        if nome_arquivo.lower().endswith('.xml'):
+            caminho_origem = os.path.join(pasta_entrada, nome_arquivo)
 
+            try:
+                # Abre e lê o conteúdo do XML (tratando a codificação padrão)
+                with open(caminho_origem, 'r', encoding='utf-8', errors='ignore') as arquivo_xml:
+                    conteudo = arquivo_xml.read()
 
-def processar_xmls_bytes(files):
-  dados = []
-  ns = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
+                # Busca o padrão da carga no texto do arquivo
+                match = padrao_carga.search(conteudo)
 
-  for uploaded_file in files:
-    try:
-      xml_bytes = uploaded_file.read()
-      root = ET.fromstring(xml_bytes)
+                if match:
+                    # Extrai apenas os números da carga
+                    numero_carga = match.group(1)
+                    nome_subpasta = f"carga {numero_carga}"
+                    caminho_subpasta = os.path.join(pasta_saida, nome_subpasta)
 
-      # 1. Extrai o Número da Nota Fiscal (nNF)
-      n_nf_elem = root.find(".//nfe:nNF", ns)
-      n_nota = n_nf_elem.text if n_nf_elem is not None else "Não encontrado"
+                    # Cria a subpasta na 'saida' se ela ainda não existir
+                    if not os.path.exists(caminho_subpasta):
+                        os.makedirs(caminho_subpasta)
 
-      # 2. Busca o texto de observação/fisco
-      inf_fisco = root.find(".//nfe:infAdFisco", ns)
-      inf_cpl = root.find(".//nfe:infCpl", ns)
+                    # Move o arquivo da 'entrada' para a subpasta correspondente na 'saida'
+                    caminho_destino = os.path.join(caminho_subpasta, nome_arquivo)
+                    shutil.move(caminho_origem, caminho_destino)
+                    
+                    print(f"[OK] Arquivo '{nome_arquivo}' movido para '{nome_subpasta}'.")
+                    contador_sucesso += 1
+                else:
+                    print(f"[Aviso] Nenhuma 'Carga' encontrada no arquivo '{nome_arquivo}'.")
+                    contador_erro += 1
 
-      texto_obs = ""
-      if inf_fisco is not None and inf_fisco.text:
-        texto_obs += inf_fisco.text + " "
-      if inf_cpl is not None and inf_cpl.text:
-        texto_obs += inf_cpl.text
+            except Exception as e:
+                print(f"[Erro] Falha ao processar o arquivo '{nome_arquivo}': {e}")
+                contador_erro += 1
 
-      # 3. Lógica para extrair Carga Origem e Carga Destino
-      carga_origem = "Não identificada"
-      carga_destino = "Não identificada"
+    print("-" * 30)
+    print("Processamento Concluído!")
+    print(f"Arquivos movidos com sucesso: {contador_sucesso}")
+    print(f"Arquivos ignorados/com erro: {contador_erro}")
 
-      matches_carga = re.findall(r"carga[:\s]*(\d+)", texto_obs, re.IGNORECASE)
-
-      if len(matches_carga) >= 2:
-        carga_origem = matches_carga[0]
-        carga_destino = matches_carga[1]
-      elif len(matches_carga) == 1:
-        carga_origem = matches_carga[0]
-        carga_destino = "Apenas uma carga"
-
-      dados.append({
-          "Arquivo": uploaded_file.name,
-          "Numero de Nota": n_nota,
-          "Carga Origem": carga_origem,
-          "Carga Destino": carga_destino,
-      })
-
-    except Exception as e:
-      st.error(f"Erro ao processar o arquivo {uploaded_file.name}: {e}")
-
-  return pd.DataFrame(dados)
-
-
-if uploaded_files:
-  if st.button("🚀 Processar e Gerar Relatório", type="primary"):
-    with st.spinner("Processando arquivos XML..."):
-      df_resultado = processar_xmls_bytes(uploaded_files)
-
-    if not df_resultado.empty:
-      st.success("✨ Processamento concluído com sucesso!")
-      st.subheader("📊 Prévia do Relatório")
-      st.dataframe(df_resultado, use_container_width=True)
-
-      # Prepara o arquivo Excel em memória para download
-      output = io.BytesIO()
-      with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df_resultado.to_excel(writer, index=False)
-      excel_data = output.getvalue()
-
-      nome_arquivo_excel = (
-          f"resultado_cargas_notas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-      )
-
-      st.download_button(
-          label="📥 Baixar Planilha Excel (XLSX)",
-          data=excel_data,
-          file_name=nome_arquivo_excel,
-          mime=(
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          ),
-          use_container_width=True,
-      )
-    else:
-      st.warning("⚠️ Nenhum dado válido foi extraído dos arquivos enviados.")
+if __name__ == "__main__":
+    organizar_xmls_por_carga()
