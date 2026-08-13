@@ -80,7 +80,7 @@ else:
         st.switch_page("pages/extrator_xml.py")
 
     def ir_para_extrator_faturas():
-        st.switch_page("pages/leitor_de_faturas.py")
+        st.switch_page("pages/Leitor_de_Faturas.py")
 
     # --- ORGANIZAÇÃO EM GRADE ---
     # Linha 1
