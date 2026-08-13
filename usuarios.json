@@ -8,6 +8,10 @@
             "nicoly.araujo": {
                 "name": "Nicoly Morais de Araujo",
                 "password": "$2b$12$2hvoSpjvB2cxEyQmeYAmrOz4V2bqFP0SoTGkkfaQsOq4b6RIsojuS"
+            },
+            "renan.lopes": {
+                "name": "Renan Henrique Lopes de Jesus",
+                "password": "$2b$12$m0g0.Huk9i7R9lRelorpgeVxeI2rHXuI3h4J/zxJ6EhduV3PrDI6q"
             }
         }
     }
