@@ -37,7 +37,7 @@ authenticator = stauth.Authenticate(
     cookie_expiry_days=cookie_config['expiry_days']
 )
 
-# --- TELA DE LOGIN CORRIGIDA ---
+# --- TELA DE LOGIN ---
 authenticator.login()
 
 authentication_status = st.session_state.get('authentication_status')
@@ -56,11 +56,11 @@ else:
     st.sidebar.markdown(f"🔑 **Usuário:** {username}")
 
     st.title("🛠️ Meu Hub de Scripts e Automações")
-    st.write(f"Bem-vindo de volta, {name}! Clique no quadro da ferramenta desejada abaixo:")
+    st.write(f"Bem-vindo de volta, {name}! Escolha a ferramenta desejada abaixo:")
 
     st.markdown("---")
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     def ir_para_romaneios():
         st.switch_page("pages/romaneios.py")
@@ -68,18 +68,26 @@ else:
     def ir_para_canhotos():
         st.switch_page("pages/canhotos.py")
 
+    def ir_para_xml():
+        st.switch_page("pages/xml_converter.py")
+
     with col1:
         with st.container(border=True):
-            st.subheader("📦 Processador de Romaneios")
-            st.write("Lê PDFs de romaneios, cruza com a UF e baixa as notas do Google Drive.")
-            
-            if st.button("Abrir Romaneios", key="btn_romaneios", use_container_width=True):
+            st.subheader("📦 Romaneios")
+            st.write("Filtra PDFs e baixa notas do Google Drive por UF.")
+            if st.button("Abrir", key="btn_romaneios", use_container_width=True):
                 ir_para_romaneios()
 
     with col2:
         with st.container(border=True):
-            st.subheader("📄 Processador de Canhotos")
-            st.write("Lê imagens de DANFE/DACTE, extrai as notas e gera a planilha.")
-            
-            if st.button("Abrir Canhotos", key="btn_canhotos", use_container_width=True):
+            st.subheader("📄 Canhotos")
+            st.write("Lê imagens de DANFE/DACTE e gera relatório Excel.")
+            if st.button("Abrir", key="btn_canhotos", use_container_width=True):
                 ir_para_canhotos()
+
+    with col3:
+        with st.container(border=True):
+            st.subheader("⚡ PDF para XML")
+            st.write("Converte PDFs em XML de forma rápida e sem IA.")
+            if st.button("Abrir", key="btn_xml", use_container_width=True):
+                ir_para_xml()
