@@ -68,12 +68,11 @@ if uploaded_p1 and uploaded_p2:
                 bytes_p1 = uploaded_p1.read()
                 bytes_p2 = uploaded_p2.read()
 
-                # 1. Varre TODAS as abas da Planilha 1 para extrair todos os CTes operacionais existentes
+                # 1. Varre TODAS as abas da Planilha 1 para extrair todos os CTes operacionais
                 xls1 = pd.ExcelFile(io.BytesIO(bytes_p1))
                 ctes_operacao = set()
 
                 for sheet in xls1.sheet_names:
-                    # Ignora abas vazias ou internas do sistema se houver
                     df_sheet = pd.read_excel(
                         io.BytesIO(bytes_p1), sheet_name=sheet, header=None
                     )
@@ -83,11 +82,10 @@ if uploaded_p1 and uploaded_p2:
                             if limpo.isdigit() and len(limpo) >= 3:
                                 ctes_operacao.add(limpo)
 
-                # 2. Carrega a Planilha 2 (a grande com 1 aba) usando openpyxl para manipular cores
+                # 2. Carrega a Planilha 2 usando openpyxl para manipular cores
                 wb2 = load_workbook(io.BytesIO(bytes_p2))
                 ws2 = wb2.active  # Pega a aba principal da planilha 2
 
-                # Converte para DataFrame para achar em quais colunas estão os CTes ('Nr. Conhec' ou 'Nro Conhec Original')
                 df_p2 = pd.read_excel(io.BytesIO(bytes_p2))
 
                 colunas_alvo_indices = []
@@ -96,22 +94,16 @@ if uploaded_p1 and uploaded_p2:
                         termo in str(col_nome).upper()
                         for termo in ["CONHEC", "CTE"]
                     ):
-                        colunas_alvo_indices.append(
-                            idx + 1
-                        )  # índice 1-based para openpyxl
+                        colunas_alvo_indices.append(idx + 1)
 
                 fill_verde = PatternFill(
                     start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"
                 )
                 total_destaques = 0
 
-                # 3. Percorre as linhas da Planilha 2 e verifica se os CTes estão presentes na Planilha 1
-                for row_idx in range(
-                    2, ws2.max_row + 1
-                ):  # Começa na linha 2 (ignorando cabeçalho)
+                # 3. Percorre as linhas da Planilha 2 e pinta se encontrar o CTe
+                for row_idx in range(2, ws2.max_row + 1):
                     linha_encontrada = False
-
-                    # Se não achou colunas específicas, verifica em todas as colunas da linha
                     cols_a_checar = (
                         colunas_alvo_indices
                         if colunas_alvo_indices
@@ -132,10 +124,6 @@ if uploaded_p1 and uploaded_p2:
                         total_destaques += 1
                         for col_i in range(1, ws2.max_column + 1):
                             ws2.cell(row=row_idx, column=col_i).fill = (
-                                st.success(
-                                    f"✨ Processo concluído! Foram destacadas"
-                                    f" {total_destaques} linhas na Planilha 2."
-                                )
                                 fill_verde
                             )
 
@@ -143,6 +131,11 @@ if uploaded_p1 and uploaded_p2:
                 output = io.BytesIO()
                 wb2.save(output)
                 processed_data = output.getvalue()
+
+                st.success(
+                    f"✨ Processo concluído! Foram destacadas {total_destaques}"
+                    " linhas na Planilha 2."
+                )
 
                 st.download_button(
                     label="📥 Baixar Planilha 2 Destacada (.XLSX)",
