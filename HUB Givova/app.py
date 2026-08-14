@@ -82,6 +82,9 @@ else:
     def ir_para_extrator_faturas():
         st.switch_page("pages/Leitor_de_Faturas.py")
 
+    def ir_para_comparador_ctes():
+        st.switch_page("pages/operacao.py")  
+
     # --- ORGANIZAÇÃO EM GRADE ---
     # Linha 1
     linha1_col1, linha1_col2 = st.columns(2)
@@ -100,7 +103,7 @@ else:
             if st.button("Abrir Ferramenta", key="btn_canhotos", use_container_width=True):
                 ir_para_canhotos()
 
-    st.write("")  # Pequeno espaçamento vertical entre as linhas
+    st.write("")  # Pequeno espaçamento vertical
 
     # Linha 2
     linha2_col1, linha2_col2 = st.columns(2)
@@ -119,9 +122,9 @@ else:
             if st.button("Abrir Ferramenta", key="btn_extrator", use_container_width=True):
                 ir_para_extrator()
 
-    st.write("")  # Pequeno espaçamento vertical entre as linhas
+    st.write("")  # Pequeno espaçamento vertical
 
-    # Linha 3 (Nova ferramenta adicionada aqui)
+    # Linha 3
     linha3_col1, linha3_col2 = st.columns(2)
 
     with linha3_col1:
@@ -132,5 +135,8 @@ else:
                 ir_para_extrator_faturas()
     
     with linha3_col2:
-        # Coluna vazia para manter o alinhamento do layout, pronta para o próximo script!
-        st.empty()
+        with st.container(border=True):
+            st.subheader("📊 Comparador de CT-es")
+            st.write("Cruza abas de CT-es com planilha de referência e destaca linhas correspondentes.")
+            if st.button("Abrir Ferramenta", key="btn_comparador_ctes", use_container_width=True):
+                ir_para_comparador_ctes()
