@@ -2,7 +2,7 @@ from datetime import datetime
 import io
 import re
 import pandas as pd
-from openpyxl import load_workbook
+from openpyxl import Workbook
 from openpyxl.styles import PatternFill
 import streamlit as st
 
@@ -82,54 +82,72 @@ if uploaded_p1 and uploaded_p2:
                             if limpo.isdigit() and len(limpo) >= 3:
                                 ctes_operacao.add(limpo)
 
-                # 2. Carrega a Planilha 2 usando openpyxl para manipular cores
-                wb2 = load_workbook(io.BytesIO(bytes_p2))
-                ws2 = wb2.active  # Pega a aba principal da planilha 2
+                # 2. Lê a Planilha 2 usando pandas (suporta tanto .xls quanto .xlsx perfeitamente)
+                # Determinamos o engine automaticamente baseado na extensão ou conteúdo
+                file_name_p2 = uploaded_p2.name.lower()
+                engine_p2 = "xlrd" if file_name_p2.endswith(".xls") else None
+                df_p2 = pd.read_excel(
+                    io.BytesIO(bytes_p2), sheet_name=0, engine=engine_p2
+                )
 
-                df_p2 = pd.read_excel(io.BytesIO(bytes_p2))
-
+                # Identifica colunas de CTe/Conhecimento na Planilha 2
                 colunas_alvo_indices = []
                 for idx, col_nome in enumerate(df_p2.columns):
                     if any(
                         termo in str(col_nome).upper()
                         for termo in ["CONHEC", "CTE"]
                     ):
-                        colunas_alvo_indices.append(idx + 1)
+                        colunas_alvo_indices.append(idx)  # 0-based index para pandas
+
+                # 3. Constrói um novo Workbook moderno em memória usando openpyxl para aplicar as formatações
+                wb_out = Workbook()
+                ws_out = wb_out.active
+                ws_out.title = "Planilha 2 Destacada"
+
+                # Escreve o cabeçalho
+                ws_out.append(list(df_p2.columns))
 
                 fill_verde = PatternFill(
                     start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"
                 )
                 total_destaques = 0
 
-                # 3. Percorre as linhas da Planilha 2 e pinta se encontrar o CTe
-                for row_idx in range(2, ws2.max_row + 1):
+                # 4. Percorre as linhas do DataFrame da Planilha 2, verifica os CTes e escreve formatado
+                for row_idx, row in df_p2.iterrows():
                     linha_encontrada = False
+
+                    # Verifica se o CTe está presente na linha nas colunas alvo (ou em todas se não houver alvo)
                     cols_a_checar = (
                         colunas_alvo_indices
                         if colunas_alvo_indices
-                        else range(1, ws2.max_column + 1)
+                        else range(len(df_p2.columns))
                     )
 
                     for col_i in cols_a_checar:
-                        val_celula = ws2.cell(
-                            row=row_idx, column=col_i
-                        ).value
-                        if val_celula is not None:
+                        val_celula = row.iloc[col_i]
+                        if pd.notna(val_celula):
                             val_limpo = limpar_cte(val_celula)
                             if val_limpo in ctes_operacao:
                                 linha_encontrada = True
                                 break
 
+                    # Prepara os valores para inserção na linha
+                    valores_linha = [
+                        ("" if pd.isna(v) else v) for v in row.values
+                    ]
+                    ws_out.append(valores_linha)
+                    current_row_idx = ws_out.max_row
+
                     if linha_encontrada:
                         total_destaques += 1
-                        for col_i in range(1, ws2.max_column + 1):
-                            ws2.cell(row=row_idx, column=col_i).fill = (
-                                fill_verde
-                            )
+                        for col_i in range(1, len(row.values) + 1):
+                            ws_out.cell(
+                                row=current_row_idx, column=col_i
+                            ).fill = fill_verde
 
                 # Salva o arquivo resultante em memória
                 output = io.BytesIO()
-                wb2.save(output)
+                wb_out.save(output)
                 processed_data = output.getvalue()
 
                 st.success(
