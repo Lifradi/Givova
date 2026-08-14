@@ -136,7 +136,7 @@ else:
     
     with linha3_col2:
         with st.container(border=True):
-            st.subheader("📊 Comparador de CT-es")
+            st.subheader("📊 Operação FIDIC")
             st.write("Cruza abas de CT-es com planilha de referência e destaca linhas correspondentes.")
             if st.button("Abrir Ferramenta", key="btn_comparador_ctes", use_container_width=True):
                 ir_para_comparador_ctes()
