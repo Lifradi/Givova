@@ -24,6 +24,10 @@
             "ana.seco":{
                 "name": "Ana Paula Seco",
                 "password": "$2b$12$pCJOU0g74EhFEkffiVWGreOF3a/z7LBbMt4fB/.cS8aN7x1CPYDz."
+            },
+            "nathan.jardim":{
+                "name": "Nathan Jardim dos Santos"
+                "password": "$2b$12$3gUoQHqiKH7xzgOndciXAuqstvvA7ohqjxXLdbtR4HESi.HXrxToS"
             }
         }
     }
