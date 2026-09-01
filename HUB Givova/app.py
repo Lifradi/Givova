@@ -85,6 +85,9 @@ else:
     def ir_para_comparador_ctes():
         st.switch_page("pages/operacao.py")  
 
+    def ir_para_extrator_boletos():
+        st.switch_page("pages/extrator_boletos.py")
+
     # --- ORGANIZAÇÃO EM GRADE ---
     # Linha 1
     linha1_col1, linha1_col2 = st.columns(2)
@@ -140,3 +143,17 @@ else:
             st.write("Cruza abas de CT-es com planilha de referência e destaca linhas correspondentes.")
             if st.button("Abrir Ferramenta", key="btn_comparador_ctes", use_container_width=True):
                 ir_para_comparador_ctes()
+
+    st.write("")  # Pequeno espaçamento vertical
+
+    # Linha 4
+    linha4_col1, linha4_col2 = st.columns(2)
+
+    with linha4_col1:
+        with st.container(border=True):
+            st.subheader("🧾 Extrator de Boletos")
+            st.write("Lê PDFs de boletos bancários e extrai os dados para controle de pagamentos.")
+            if st.button("Abrir Ferramenta", key="btn_boletos", use_container_width=True):
+                ir_para_extrator_boletos()
+                
+    # A segunda coluna da linha 4 fica vazia por enquanto para manter o layout alinhado
