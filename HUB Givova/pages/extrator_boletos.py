@@ -68,34 +68,43 @@ def extrair_dados_boletos(arquivo_pdf):
                 }
 
                 # =========================================================
-                # REGRAS DE EXTRAÇÃO PARA BOLETOS
+                # REGRAS DE EXTRAÇÃO PARA BOLETOS CORRIGIDAS
                 # =========================================================
 
-                # 1. Vencimento
-                # Tenta capturar do layout do boleto (ex: "Vencimento 22/09/2026")
-                match_venc = re.search(r'(?:Vencimento|Data\s*de\s*Vencimento)\s*[:\s]*(\d{2}/\d{2}/\d{2,4})', texto, re.IGNORECASE)
+                # 1. Fornecedor (Beneficiário)
+                # Captura o texto entre "Beneficiário" e o hífen que antecede o CNPJ
+                match_fornecedor = re.search(r'Beneficiário\s*\n(.*?)\s*-', texto, re.IGNORECASE)
+                if match_fornecedor:
+                    dados['fornecedor'] = match_fornecedor.group(1).strip()
+
+                # 2. Vencimento
+                # Evita pegar datas residuais, focando na palavra exata seguida da data
+                match_venc = re.search(r'Vencimento\s*\n?(\d{2}/\d{2}/\d{4})', texto, re.IGNORECASE)
                 if match_venc:
                     dados['vencimento'] = match_venc.group(1).strip()
 
-                # 2. Valor do Documento
-                # Tenta capturar do layout do boleto (ex: "Valor documento 2.221,86")
-                match_valor = re.search(r'(?:\(=\)\s*Valor\s*do\s*Documento|Valor\s*documento|Valor\s*Cobrado)\s*[:\s]*R?\$?\s*([\d.,]+)', texto, re.IGNORECASE)
+                # 3. Valor do Documento (Total)
+                # Busca especificamente pela linha de totalização final "(=) Valor documento"
+                match_valor = re.search(r'\(\=\)\s*Valor\s*documento\s*\n?([\d.,]+)', texto, re.IGNORECASE)
+                if not match_valor:
+                    # Alternativa caso o (=) não seja lido
+                    match_valor = re.search(r'Valor\s*documento\s*\n?(\d{1,3}(?:\.\d{3})*,\d{2})', texto, re.IGNORECASE)
+                
                 if match_valor:
                     dados['total'] = match_valor.group(1).strip()
 
-                # 3. Data do Documento / Data de Emissão
-                # Tenta capturar a data de emissão
-                match_emissao = re.search(r'(?:Data\s*do\s*Doc(?:umento)?|Data\s*Emissã[o0])\s*[:\s]*(\d{2}/\d{2}/\d{2,4})', texto, re.IGNORECASE)
+                # 4. Data do Documento / Data de Emissão
+                match_emissao = re.search(r'Data\s*do\s*documento\s*\n?(\d{2}/\d{2}/\d{4})', texto, re.IGNORECASE)
                 if match_emissao:
                     dados['emissão doc.'] = match_emissao.group(1).strip()
 
-                # 4. Número do Documento
-                # Como observado nos layouts do Bradesco: "Nº documento 23978" 
-                # Tenta extrair a chave específica ou recua pegando os números próximos ao cabeçalho.
-                match_doc = re.search(r'N[ºo]?\s*documento[\s\S]*?(\d{4,10})', texto, re.IGNORECASE)
+                # 5. Número do Documento
+                # Como o layout tem uma quebra de linha com o "nosso número" antes do número real
+                # (ex: Número do documento \n 09/00000062629-8 \n 23978)
+                match_doc = re.search(r'Número\s*do\s*documento\s*\n[^\n]+\n(\d+)', texto, re.IGNORECASE)
                 if not match_doc:
-                    # Alternativa se tiver no layout lateral: 09/00000062629-8 23978
-                    match_doc = re.search(r'\d{2}/\d{11}-\w\s+(\d+)', texto)
+                    # Tenta ler no cabeçalho superior "Nº documento \n Espécie \n Aceite \n 23978"
+                    match_doc = re.search(r'N[ºo]?\s*documento\s*\n(?:[^\n]+\n){2}(\d+)', texto, re.IGNORECASE)
                 
                 if match_doc:
                     dados['documento'] = match_doc.group(1).strip()
