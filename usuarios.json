@@ -28,6 +28,14 @@
             "nathan.jardim":{
                 "name": "Nathan Jardim dos Santos",
                 "password": "$2b$12$3gUoQHqiKH7xzgOndciXAuqstvvA7ohqjxXLdbtR4HESi.HXrxToS"
+            },
+            "laura.lisboa":{
+                "name": "Laura Lisboa da Silva",
+                "password": "$2b$12$wJbUpdR7Zh8Rxcw0z4niG.ZgOCOpLu9NU0WXcSdyoIXlXYAhrObYO"
+            },
+            "joana.rodrigues":{
+                "name": "Joana Dar'arc da Silva Rodrigues",
+                "password": "$2b$12$UGDlR6J1nHkwxgzF/b10Ru5NpvffezdFzH1Iu66U6qoPB4VGwmC7u"
             }
         }
     }
