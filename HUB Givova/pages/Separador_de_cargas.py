@@ -3,6 +3,7 @@ import json
 import os
 import re
 import zipfile
+import xml.etree.ElementTree as ET
 import streamlit as st
 import streamlit_authenticator as stauth
 
@@ -43,7 +44,6 @@ authenticator = stauth.Authenticate(
     cookie_expiry_days=cookie_config["expiry_days"],
 )
 
-# Tenta carregar o estado da sessão de login
 authentication_status = st.session_state.get("authentication_status")
 name = st.session_state.get("name")
 username = st.session_state.get("username")
@@ -58,9 +58,25 @@ if not authentication_status:
     st.switch_page("app.py")
   st.stop()
 
-# Se estiver logado, exibe os elementos da barra lateral
 authenticator.logout("Sair do Sistema", "sidebar", key="logout_xmls")
 st.sidebar.markdown(f"👤 **Logado como:** {name}")
+
+
+# --- FUNÇÃO AUXILIAR: UF DO DESTINATÁRIO ---
+def extrair_uf_destino(bytes_xml):
+  """Lê <dest><enderDest><UF> ignorando o namespace da NFe."""
+  try:
+    root = ET.fromstring(bytes_xml)
+  except ET.ParseError:
+    return None
+
+  for elem in root.iter():
+    if elem.tag.split("}")[-1] == "dest":
+      for sub in elem.iter():
+        if sub.tag.split("}")[-1] == "UF" and sub.text:
+          return sub.text.strip().upper()
+  return None
+
 
 # --- CORPO DO SISTEMA ---
 st.title("📁 Organizador de XMLs por Carga")
@@ -69,7 +85,6 @@ st.write(
     "separa-os automaticamente por número de carga e gera um arquivo ZIP organizado."
 )
 
-# Componente para upload de múltiplos arquivos XML
 arquivos_xml = st.file_uploader(
     "📂 Envie os arquivos XML", type=["xml"], accept_multiple_files=True
 )
@@ -80,7 +95,7 @@ if arquivos_xml:
 
     contador_sucesso = 0
     contador_erro = 0
-    cargas_encontradas = {}  # Dicionário para armazenar {numero_carga: {nome_arquivo: bytes}}
+    cargas_encontradas = {}  # {numero_carga: {nome_arquivo: bytes}}
 
     with st.spinner("Processando e organizando os arquivos..."):
       for arquivo in arquivos_xml:
@@ -92,11 +107,15 @@ if arquivos_xml:
 
           if match:
             numero_carga = match.group(1)
+            uf_destino = extrair_uf_destino(bytes_conteudo) or "SEM-UF"
+
+            # Novo nome: UF_nomeoriginal.xml
+            novo_nome = f"{uf_destino}_{nome_arquivo}"
 
             if numero_carga not in cargas_encontradas:
               cargas_encontradas[numero_carga] = {}
 
-            cargas_encontradas[numero_carga][nome_arquivo] = bytes_conteudo
+            cargas_encontradas[numero_carga][novo_nome] = bytes_conteudo
             contador_sucesso += 1
           else:
             contador_erro += 1
@@ -104,7 +123,6 @@ if arquivos_xml:
         except Exception as e:
           contador_erro += 1
 
-    # Exibe métricas do processamento
     col1, col2 = st.columns(2)
     col1.metric("XMLs Organizados com Sucesso", contador_sucesso)
     col2.metric("XMLs sem Carga / Erros", contador_erro)
