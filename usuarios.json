@@ -36,6 +36,10 @@
             "joana.rodrigues":{
                 "name": "Joana Dar'arc da Silva Rodrigues",
                 "password": "$2b$12$UGDlR6J1nHkwxgzF/b10Ru5NpvffezdFzH1Iu66U6qoPB4VGwmC7u"
+            },
+            "gustavo.oliveira":{
+                "name": "Gustavo Henrique Soares de Oliveira",
+                "password": "$2b$12$eH7754l6zLdtZHnc.ykPs.Cq5ofR1Pza5Jlb/P0mtBPVOXbE8b4gi"
             }
         }
     }
